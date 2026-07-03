@@ -1,322 +1,573 @@
 <template>
-  <div class="login-wrapper vibrant">
-    <!-- 装饰元素 -->
-    <div class="deco-paw paw1">🐾</div>
-    <div class="deco-paw paw2">🦴</div>
-    <div class="deco-paw paw3">🐕</div>
-    <div class="deco-paw paw4">🐈</div>
-
-    <div class="login-card">
-      <!-- Logo 区域 -->
-      <div class="login-header">
-        <div class="logo">
-          <span class="logo-icon">🐾</span>
-          <span class="logo-text">宠迹</span>
-        </div>
-        <p class="subtitle">让每一份爱都有迹可循</p>
+  <a-layout class="layout">
+    <!-- ====== 侧边栏 ====== -->
+    <a-layout-sider
+      class="sider"
+      :collapsed="collapsed"
+      :width="220"
+      :collapsed-width="64"
+      breakpoint="lg"
+      @collapse="onCollapse"
+    >
+      <div class="logo-area">
+        <span class="logo-icon">🐾</span>
+        <span v-if="!collapsed" class="logo-text">宠迹</span>
       </div>
 
-      <!-- 表单 -->
-      <a-form :model="form" @submit="handleLogin" class="login-form">
-        <a-form-item field="phone" :rules="[{required: true, message: '请输入手机号'}]">
-          <a-input
-            v-model="form.phone"
-            placeholder="手机号"
-            size="large"
-            allow-clear
-          >
-            <template #prefix><icon-phone /></template>
-          </a-input>
-        </a-form-item>
+      <a-menu
+        class="sider-menu"
+        :selected-keys="selectedKeys"
+        @menu-item-click="onMenuClick"
+      >
+        <a-menu-item key="dashboard">
+          <template #icon><icon-dashboard /></template>
+          工作台
+        </a-menu-item>
+        <a-menu-item key="pets">
+          <template #icon><icon-facebook /></template>
+          宠物管理
+        </a-menu-item>
+        <a-menu-item key="appointments">
+          <template #icon><icon-calendar /></template>
+          预约管理
+        </a-menu-item>
+        <a-menu-item key="users">
+          <template #icon><icon-user-group /></template>
+          用户管理
+        </a-menu-item>
+        <a-menu-item key="settings">
+          <template #icon><icon-settings /></template>
+          系统设置
+        </a-menu-item>
+      </a-menu>
+    </a-layout-sider>
 
-        <a-form-item field="password" :rules="[{required: true, message: '请输入密码'}]">
-          <a-input-password
-            v-model="form.password"
-            placeholder="密码"
-            size="large"
-            allow-clear
-          >
-            <template #prefix><icon-lock /></template>
-          </a-input-password>
-        </a-form-item>
-
-        <a-form-item>
+    <!-- ====== 主内容 ====== -->
+    <a-layout>
+      <!-- 顶部栏 -->
+      <a-layout-header class="header">
+        <div class="header-left">
           <a-button
-            type="primary"
-            html-type="submit"
-            long
-            size="large"
-            :loading="loading"
-            class="login-btn"
+            type="text"
+            @click="collapsed = !collapsed"
+            class="collapse-btn"
           >
-            {{ loading ? '登录中...' : '登 录' }}
+            <icon-menu-fold v-if="!collapsed" />
+            <icon-menu-unfold v-else />
           </a-button>
-        </a-form-item>
-
-        <div class="login-footer">
-          <a-link href="/register">注册账号</a-link>
-          <a-link href="/forgot">忘记密码？</a-link>
+          <a-breadcrumb class="breadcrumb">
+            <a-breadcrumb-item>首页</a-breadcrumb-item>
+            <a-breadcrumb-item>工作台</a-breadcrumb-item>
+          </a-breadcrumb>
         </div>
-      </a-form>
-    </div>
 
-    <div class="copyright">© 2026 宠迹 · 让爱有迹可循</div>
-  </div>
+        <div class="header-right">
+          <a-badge :count="5" :dot="true">
+            <a-button type="text" shape="circle">
+              <icon-notification />
+            </a-button>
+          </a-badge>
+
+          <a-dropdown trigger="click">
+            <div class="user-info">
+              <a-avatar :size="32" class="user-avatar">
+                {{ userInitial }}
+              </a-avatar>
+              <span class="user-name">{{ userName }}</span>
+              <icon-down />
+            </div>
+            <template #content>
+              <a-doption @click="handleLogout">
+                <template #icon><icon-export /></template>
+                退出登录
+              </a-doption>
+            </template>
+          </a-dropdown>
+        </div>
+      </a-layout-header>
+
+      <!-- 内容区 -->
+      <a-layout-content class="content">
+        <!-- 欢迎卡片 -->
+        <div class="welcome-card">
+          <div class="welcome-text">
+            <h1>👋 欢迎回来，{{ userName }}！</h1>
+            <p>今天是 {{ currentDate }}，祝你和毛孩子都有美好的一天 🐾</p>
+          </div>
+          <div class="welcome-emoji">🐕</div>
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="stats-grid">
+          <a-card class="stat-card" :bordered="false" hoverable>
+            <div class="stat-icon pet-icon">🐾</div>
+            <div class="stat-content">
+              <div class="stat-number">{{ stats.pets }}</div>
+              <div class="stat-label">宠物总数</div>
+            </div>
+          </a-card>
+
+          <a-card class="stat-card" :bordered="false" hoverable>
+            <div class="stat-icon appointment-icon">📅</div>
+            <div class="stat-content">
+              <div class="stat-number">{{ stats.appointments }}</div>
+              <div class="stat-label">今日预约</div>
+            </div>
+          </a-card>
+
+          <a-card class="stat-card" :bordered="false" hoverable>
+            <div class="stat-icon user-icon">👤</div>
+            <div class="stat-content">
+              <div class="stat-number">{{ stats.users }}</div>
+              <div class="stat-label">用户总数</div>
+            </div>
+          </a-card>
+
+          <a-card class="stat-card" :bordered="false" hoverable>
+            <div class="stat-icon revenue-icon">💰</div>
+            <div class="stat-content">
+              <div class="stat-number">¥{{ stats.revenue }}</div>
+              <div class="stat-label">本月收入</div>
+            </div>
+          </a-card>
+        </div>
+
+        <!-- 快捷操作 -->
+        <div class="quick-actions">
+          <h3 class="section-title">快捷操作</h3>
+          <div class="action-grid">
+            <div class="action-item" @click="navigateTo('/pets')">
+              <div class="action-icon">➕</div>
+              <span>添加宠物</span>
+            </div>
+            <div class="action-item" @click="navigateTo('/appointments')">
+              <div class="action-icon">📋</div>
+              <span>新建预约</span>
+            </div>
+            <div class="action-item" @click="navigateTo('/users')">
+              <div class="action-icon">👥</div>
+              <span>邀请家人</span>
+            </div>
+            <div class="action-item" @click="navigateTo('/settings')">
+              <div class="action-icon">⚙️</div>
+              <span>系统设置</span>
+            </div>
+          </div>
+        </div>
+      </a-layout-content>
+    </a-layout>
+  </a-layout>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { Message } from '@arco-design/web-vue';
-import axios from 'axios';
-import { IconPhone, IconLock } from '@arco-design/web-vue/es/icon';
+import {
+  IconDashboard,
+  IconFacebook,
+  IconCalendar,
+  IconUserGroup,
+  IconSettings,
+  IconMenuFold,
+  IconMenuUnfold,
+  IconNotification,
+  IconDown,
+  IconExport,
+} from '@arco-design/web-vue/es/icon';
 
-const form = reactive({
-  phone: '13900139000',
-  password: '123456',
+const router = useRouter();
+
+// ============ 状态 ============
+const collapsed = ref(false);
+const selectedKeys = ref(['dashboard']);
+
+// 用户信息（从 localStorage 或 store 获取）
+const userName = ref('宠友');
+const userPhone = ref('');
+
+// 统计数据（后续对接真实 API）
+const stats = ref({
+  pets: 0,
+  appointments: 0,
+  users: 0,
+  revenue: 0,
 });
-const loading = ref(false);
 
-const handleLogin = async () => {
-  loading.value = true;
-  try {
-    const res = await axios.post('/api/auth/login', form);
-    if (res.data.code === 200) {
-      Message.success('登录成功 🎉');
-      localStorage.setItem('token', res.data.data.token);
-      window.location.href = '/';
-    } else {
-      Message.error(res.data.message || '登录失败');
-    }
-  } catch {
-    Message.error('请求失败，请检查后端服务是否启动');
-  } finally {
-    loading.value = false;
+// ============ 计算属性 ============
+const userInitial = computed(() => {
+  return userName.value ? userName.value.charAt(0).toUpperCase() : 'U';
+});
+
+const currentDate = computed(() => {
+  const now = new Date();
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+  return `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 星期${weekdays[now.getDay()]}`;
+});
+
+// ============ 方法 ============
+function onCollapse(value: boolean) {
+  collapsed.value = value;
+}
+
+function onMenuClick(key: string) {
+  selectedKeys.value = [key];
+  // 暂时只有 dashboard 有内容，其余留空
+  if (key !== 'dashboard') {
+    Message.info('功能开发中，敬请期待 🚀');
   }
-};
+}
+
+function navigateTo(path: string) {
+  // 暂不跳转，仅提示
+  Message.info('功能开发中，敬请期待 🚀');
+  // router.push(path);
+}
+
+function handleLogout() {
+  localStorage.removeItem('token');
+  Message.success('已退出登录');
+  router.push('/login');
+}
+
+// ============ 初始化 ============
+onMounted(() => {
+  // 从 localStorage 读取用户信息（登录时存入）
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    // 如果有用户信息存储，可读取
+    // const userInfo = localStorage.getItem('userInfo');
+    // if (userInfo) {
+    //   const parsed = JSON.parse(userInfo);
+    //   userName.value = parsed.nickname || parsed.phone || '宠友';
+    //   userPhone.value = parsed.phone || '';
+    // }
+    // 模拟数据
+    userName.value = '宠迹主人';
+    stats.value = {
+      pets: 3,
+      appointments: 5,
+      users: 12,
+      revenue: 2860,
+    };
+  } catch {
+    // 忽略
+  }
+});
 </script>
 
 <style scoped>
-/* ===== 整体布局 ===== */
-.vibrant {
+/* ====== 整体布局 ====== */
+.layout {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: linear-gradient(135deg, #f9e8ff 0%, #e8f0ff 40%, #ffe8f0 100%);
-  position: relative;
-  overflow: hidden;
+  background: #f7f9fc;
 }
 
-/* ===== 浮动装饰元素 ===== */
-.deco-paw {
-  position: absolute;
-  font-size: 40px;
-  opacity: 0.15;
-  animation: floatPaw 12s infinite alternate ease-in-out;
-  pointer-events: none;
-  user-select: none;
-}
-.paw1 { top: 8%; left: 5%; animation-duration: 14s; }
-.paw2 { top: 15%; right: 8%; animation-duration: 10s; font-size: 32px; }
-.paw3 { bottom: 20%; left: 10%; animation-duration: 16s; font-size: 48px; }
-.paw4 { bottom: 10%; right: 5%; animation-duration: 12s; font-size: 36px; }
-
-@keyframes floatPaw {
-  0% { transform: translate(0, 0) rotate(0deg) scale(1); }
-  100% { transform: translate(30px, -20px) rotate(15deg) scale(1.1); }
+/* ====== 侧边栏 ====== */
+.sider {
+  background: linear-gradient(180deg, #f9f0ff 0%, #f0e6ff 100%);
+  border-right: 1px solid rgba(124, 92, 191, 0.1);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
-/* ===== 彩色圆点背景 ===== */
-.vibrant::before {
-  content: '';
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  background-image:
-    radial-gradient(circle at 10% 20%, #ff9aa2 6%, transparent 6%),
-    radial-gradient(circle at 90% 30%, #b5e6c3 8%, transparent 8%),
-    radial-gradient(circle at 20% 80%, #f9d976 10%, transparent 10%),
-    radial-gradient(circle at 80% 70%, #a2c9f9 12%, transparent 12%),
-    radial-gradient(circle at 50% 50%, #e3b0f0 14%, transparent 14%);
-  background-size: 300px 300px;
-  opacity: 0.2;
-  pointer-events: none;
-  animation: dotMove 30s linear infinite;
-}
-
-@keyframes dotMove {
-  0% { transform: translate(0, 0); }
-  50% { transform: translate(-20px, 10px); }
-  100% { transform: translate(20px, -10px); }
-}
-
-/* ===== 登录卡片 ===== */
-.login-card {
-  width: 100%;
-  max-width: 420px;
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: 40px;
-  padding: 40px 36px;
-  box-shadow: 0 20px 60px rgba(150, 100, 200, 0.2),
-              inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  animation: cardPop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
-  position: relative;
-  z-index: 2;
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.login-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 28px 80px rgba(150, 100, 200, 0.3);
-}
-
-@keyframes cardPop {
-  0% { opacity: 0; transform: scale(0.8) rotate(-2deg); }
-  100% { opacity: 1; transform: scale(1) rotate(0); }
-}
-
-/* ===== 头部 ===== */
-.login-header {
-  text-align: center;
-  margin-bottom: 32px;
-}
-
-.logo {
+.logo-area {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
+  padding: 20px 16px;
+  border-bottom: 1px solid rgba(124, 92, 191, 0.08);
+  min-height: 64px;
 }
 
 .logo-icon {
-  font-size: 40px;
-  animation: wiggle 2.5s infinite ease-in-out;
-}
-
-@keyframes wiggle {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-8deg); }
-  75% { transform: rotate(8deg); }
+  font-size: 28px;
 }
 
 .logo-text {
-  font-size: 32px;
+  font-size: 22px;
   font-weight: 700;
-  color: #5c3d7a;
-  letter-spacing: 2px;
   background: linear-gradient(135deg, #7c5cbf, #b88ad6);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-.subtitle {
-  font-size: 14px;
-  color: #7a6a8a;
-  margin-top: 6px;
-  letter-spacing: 1.5px;
+.sider-menu :deep(.arco-menu-item) {
+  border-radius: 12px;
+  margin: 4px 12px;
+  font-weight: 500;
+  color: #4e5969;
 }
 
-/* ===== 表单 ===== */
-.login-form :deep(.arco-form-item) {
-  margin-bottom: 20px;
-}
-
-.login-form :deep(.arco-input-wrapper) {
-  border-radius: 16px;
-  border: 1.5px solid #e5dce8;
-  background: rgba(255, 255, 255, 0.6);
-  transition: all 0.3s;
-}
-
-.login-form :deep(.arco-input-wrapper:focus-within) {
-  border-color: #a78cfa;
-  box-shadow: 0 0 0 4px rgba(167, 140, 250, 0.2);
-  background: #ffffff;
-}
-
-.login-form :deep(.arco-input-prefix) {
-  color: #a78cfa;
-}
-
-.login-btn {
-  border-radius: 20px;
-  height: 50px;
-  font-size: 16px;
-  font-weight: 600;
+.sider-menu :deep(.arco-menu-item.arco-menu-selected) {
   background: linear-gradient(135deg, #a78cfa, #7c5cbf);
-  border: none;
-  transition: all 0.3s ease;
+  color: #ffffff;
+}
+
+.sider-menu :deep(.arco-menu-item:hover) {
+  background: rgba(124, 92, 191, 0.08);
+}
+
+/* ====== 顶部栏 ====== */
+.header {
+  background: #ffffff;
+  border-bottom: 1px solid #f0f2f5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: 64px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.collapse-btn {
+  font-size: 18px;
+  color: #4e5969;
+}
+
+.breadcrumb :deep(.arco-breadcrumb-item) {
+  color: #86909c;
+  font-size: 14px;
+}
+.breadcrumb :deep(.arco-breadcrumb-item:last-child) {
+  color: #1d2129;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 12px 4px 4px;
+  border-radius: 20px;
+  transition: background 0.2s;
+}
+.user-info:hover {
+  background: #f7f9fc;
+}
+
+.user-avatar {
+  background: linear-gradient(135deg, #a78cfa, #7c5cbf);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1d2129;
+}
+
+/* ====== 内容区 ====== */
+.content {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ====== 欢迎卡片 ====== */
+.welcome-card {
+  background: linear-gradient(135deg, #f9f0ff 0%, #f0e6ff 100%);
+  border-radius: 20px;
+  padding: 32px 36px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  border: 1px solid rgba(124, 92, 191, 0.08);
   position: relative;
   overflow: hidden;
 }
 
-.login-btn::after {
+.welcome-card::after {
   content: '';
   position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 60%);
-  animation: btnShine 3s infinite;
+  right: -40px;
+  top: -40px;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(167, 140, 250, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
 }
 
-@keyframes btnShine {
-  0% { transform: rotate(0deg) translate(-30%, -30%); }
-  100% { transform: rotate(360deg) translate(30%, 30%); }
+.welcome-text h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1d2129;
+  margin: 0 0 8px 0;
 }
-
-.login-btn:hover {
-  transform: scale(1.02);
-  box-shadow: 0 8px 30px rgba(124, 92, 191, 0.4);
-}
-
-.login-btn:active {
-  transform: scale(0.98);
-}
-
-.login-footer {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 12px;
-}
-
-.login-footer :deep(.arco-link) {
-  color: #8a7a9a;
+.welcome-text p {
   font-size: 14px;
-  transition: color 0.2s;
+  color: #4e5969;
+  margin: 0;
 }
 
-.login-footer :deep(.arco-link:hover) {
-  color: #7c5cbf;
+.welcome-emoji {
+  font-size: 56px;
+  animation: floatPaw 4s ease-in-out infinite;
 }
 
-.copyright {
-  margin-top: 30px;
-  color: #9a8aaa;
+@keyframes floatPaw {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(5deg); }
+}
+
+/* ====== 统计卡片 ====== */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.stat-card {
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background: #ffffff;
+  border: 1px solid #f0f2f5;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+}
+
+.stat-icon {
+  font-size: 32px;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
+.pet-icon { background: #f0f0ff; }
+.appointment-icon { background: #e8f5e9; }
+.user-icon { background: #fff3e0; }
+.revenue-icon { background: #e3f2fd; }
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-number {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1d2129;
+}
+
+.stat-label {
   font-size: 13px;
-  letter-spacing: 1px;
-  opacity: 0.6;
-  z-index: 2;
-  position: relative;
+  color: #86909c;
+  margin-top: 2px;
 }
 
-/* ===== 响应式 ===== */
-@media (max-width: 480px) {
-  .login-card {
-    padding: 28px 20px;
-    border-radius: 28px;
+/* ====== 快捷操作 ====== */
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1d2129;
+  margin: 0 0 16px 0;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 16px;
+}
+
+.action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #f0f2f5;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  gap: 8px;
+}
+
+.action-item:hover {
+  transform: translateY(-4px);
+  border-color: #a78cfa;
+  box-shadow: 0 8px 30px rgba(167, 140, 250, 0.15);
+}
+
+.action-icon {
+  font-size: 28px;
+}
+
+.action-item span {
+  font-size: 13px;
+  color: #4e5969;
+  font-weight: 500;
+}
+
+/* ====== 响应式 ====== */
+@media (max-width: 768px) {
+  .welcome-card {
+    flex-direction: column;
+    text-align: center;
+    padding: 24px 20px;
   }
-  .logo-text {
-    font-size: 26px;
+  .welcome-emoji {
+    font-size: 40px;
+    margin-top: 12px;
   }
-  .deco-paw {
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .action-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .user-name {
     display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .action-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .header {
+    padding: 0 12px;
+  }
+  .content {
+    padding: 16px;
   }
 }
 </style>
