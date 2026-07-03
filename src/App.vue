@@ -1,26 +1,19 @@
 <template>
-  <a-config-provider :locale="locale">
-    <router-view />
-    <global-setting />
-  </a-config-provider>
+  <SplashScreen
+    v-if="showSplash"
+    video-src="/videos/seedance-mini-开场动画.mp4"
+    @finish="onSplashFinish"
+  />
+  <router-view v-show="!showSplash" />
 </template>
 
-<script lang="ts" setup>
-  import { computed } from 'vue';
-  import enUS from '@arco-design/web-vue/es/locale/lang/en-us';
-  import zhCN from '@arco-design/web-vue/es/locale/lang/zh-cn';
-  import GlobalSetting from '@/components/global-setting/index.vue';
-  import useLocale from '@/hooks/locale';
+<script setup lang="ts">
+import { ref } from 'vue';
+import SplashScreen from '@/components/SplashScreen.vue';
 
-  const { currentLocale } = useLocale();
-  const locale = computed(() => {
-    switch (currentLocale.value) {
-      case 'zh-CN':
-        return zhCN;
-      case 'en-US':
-        return enUS;
-      default:
-        return enUS;
-    }
-  });
+const showSplash = ref(true);
+
+function onSplashFinish() {
+  showSplash.value = false;
+}
 </script>

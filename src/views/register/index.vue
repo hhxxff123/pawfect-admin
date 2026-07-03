@@ -56,6 +56,50 @@
           </a-input>
         </a-form-item>
 
+        <!-- 图形验证码 -->
+        <a-form-item field="captchaCode">
+          <div class="captcha-row">
+            <a-input
+              v-model="form.captchaCode"
+              placeholder="图形验证码"
+              size="large"
+              allow-clear
+              style="flex: 1"
+            />
+            <img
+              :src="captchaUrl"
+              alt="验证码"
+              class="captcha-image"
+              title="点击刷新"
+              @click="refreshCaptcha"
+            />
+          </div>
+        </a-form-item>
+
+        <!-- 短信验证码 -->
+        <a-form-item field="smsCode">
+          <a-input
+            v-model="form.smsCode"
+            placeholder="短信验证码"
+            size="large"
+            allow-clear
+          >
+            <template #prefix><icon-message /></template>
+            <template #suffix>
+              <a-button
+                type="text"
+                size="small"
+                :loading="smsLoading"
+                :disabled="smsCountdown > 0"
+                class="sms-btn"
+                @click="sendSmsCode"
+              >
+                {{ smsCountdown > 0 ? `${smsCountdown}s` : '获取验证码' }}
+              </a-button>
+            </template>
+          </a-input>
+        </a-form-item>
+
         <a-form-item>
           <a-button
             type="primary"
@@ -81,47 +125,127 @@
 </template>
 
 <script setup lang="ts">
-  import { reactive, ref } from 'vue';
+  import { reactive, ref, computed } from 'vue';
   import { Message } from '@arco-design/web-vue';
-  import axios from '@/utils/request';  // ⚠️ 注意：从 utils/request 导入，而不是直接 import axios
-  import { IconPhone, IconLock, IconUser } from '@arco-design/web-vue/es/icon';
+  import axios from '@/utils/request';
+  import { IconPhone, IconLock, IconUser, IconMessage } from '@arco-design/web-vue/es/icon';
 
   // 表单数据
   const form = reactive({
     phone: '',
     password: '',
     nickname: '',
+    captchaCode: '',
+    smsCode: '',
   });
 
   // 表单校验规则（可选）
   const rules = {
     phone: [{ required: true, message: '请输入手机号' }],
     password: [{ required: true, message: '请输入密码' }],
+    captchaCode: [{ required: true, message: '请输入图形验证码' }],
+    smsCode: [{ required: true, message: '请输入短信验证码' }],
   };
 
   const loading = ref(false);
+  const smsLoading = ref(false);
+  const smsCountdown = ref(0);
+  let countdownTimer: number | null = null;
+
+  // 图形验证码
+  function generateCaptchaKey() {
+    return `captcha_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+  const captchaKey = ref(generateCaptchaKey());
+  const captchaUrl = computed(
+    () => `/api/captcha/image?captchaKey=${captchaKey.value}`
+  );
+
+  function refreshCaptcha() {
+    captchaKey.value = generateCaptchaKey();
+    form.captchaCode = '';
+  }
+
+  // 发送短信验证码
+  async function sendSmsCode() {
+    if (!form.phone.match(/^1[3-9]\d{9}$/)) {
+      Message.warning('请输入正确的手机号');
+      return;
+    }
+    if (!form.captchaCode) {
+      Message.warning('请先输入图形验证码');
+      return;
+    }
+
+    smsLoading.value = true;
+    try {
+      const res = await axios.post('/api/sms/send', null, {
+        params: {
+          phone: form.phone,
+          captchaKey: captchaKey.value,
+          captchaCode: form.captchaCode,
+        },
+      });
+      if (res.data.code === 200) {
+        Message.success('验证码已发送');
+        smsCountdown.value = 60;
+        countdownTimer = window.setInterval(() => {
+          smsCountdown.value -= 1;
+          if (smsCountdown.value <= 0) {
+            clearInterval(countdownTimer!);
+            countdownTimer = null;
+          }
+        }, 1000);
+        refreshCaptcha();
+      } else {
+        Message.error(res.data.message || '发送失败');
+        refreshCaptcha();
+      }
+    } catch {
+      Message.error('发送失败，请检查网络');
+      refreshCaptcha();
+    } finally {
+      smsLoading.value = false;
+    }
+  }
 
   // 注册逻辑
   async function handleRegister() {
-  loading.value = true;
-  try {
-    // 使用封装好的 service
-    const response = await axios.post('/api/auth/register', form);
-    const res = response.data;
-
-    if (res.code === 200) {
-      Message.success('🎉 注册成功，请登录');
-      window.location.href = '/login';
-    } else {
-      Message.error(res.message || '注册失败');
+    if (!form.phone.match(/^1[3-9]\d{9}$/)) {
+      Message.warning('请输入正确的手机号');
+      return;
     }
-  } catch (error: any) {
-    // 拦截器已经显示了错误提示，这里不再显示
-    console.log('注册失败:', error.message);
-  } finally {
-    loading.value = false;
+    if (!form.password || form.password.length < 6) {
+      Message.warning('密码长度至少6位');
+      return;
+    }
+    if (!form.smsCode) {
+      Message.warning('请输入短信验证码');
+      return;
+    }
+
+    loading.value = true;
+    try {
+      const response = await axios.post('/api/auth/register', {
+        phone: form.phone,
+        password: form.password,
+        nickname: form.nickname || '',
+        smsCode: form.smsCode,
+      });
+      const res = response.data;
+
+      if (res.code === 200) {
+        Message.success('🎉 注册成功，请登录');
+        window.location.href = '/login';
+      } else {
+        Message.error(res.message || '注册失败');
+      }
+    } catch (error: any) {
+      console.log('注册失败:', error.message);
+    } finally {
+      loading.value = false;
+    }
   }
-}
 </script>
 
 <style scoped>
@@ -315,6 +439,40 @@
 
   .register-form :deep(.arco-input-prefix) {
     color: #a78cfa;
+  }
+
+  /* ===== 图形验证码 ===== */
+  .captcha-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+  }
+
+  .captcha-image {
+    width: 120px;
+    height: 40px;
+    cursor: pointer;
+    border-radius: 8px;
+    border: 1px solid #e5dce8;
+    flex-shrink: 0;
+    transition: transform 0.2s;
+  }
+
+  .captcha-image:hover {
+    transform: scale(1.03);
+  }
+
+  /* ===== 短信验证码按钮 ===== */
+  .sms-btn {
+    color: #7c5cbf;
+    font-weight: 500;
+  }
+  .sms-btn:hover {
+    color: #5c3c9f;
+  }
+  .sms-btn:disabled {
+    color: #a9aeb8;
   }
 
   .register-btn {
