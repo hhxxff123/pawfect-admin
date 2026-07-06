@@ -1,5 +1,7 @@
 <template>
   <div class="login-wrapper vibrant">
+    <LoginLoader v-if="showLoader" />
+    
     <!-- 浮动装饰 -->
     <div class="deco-paw paw1">🐾</div>
     <div class="deco-paw paw2">🦴</div>
@@ -7,16 +9,36 @@
     <div class="deco-paw paw4">🐈</div>
 
     <div class="login-card">
+      <!-- ===== 角色切换 ===== -->
+      <div class="role-switch">
+        <button
+          class="role-btn"
+          :class="{ active: currentRole === 'user' }"
+          @click="switchRole('user')"
+        >
+          <span class="role-icon">🐾</span>
+          <span class="role-text">我是宠物主</span>
+        </button>
+        <button
+          class="role-btn"
+          :class="{ active: currentRole === 'business' }"
+          @click="switchRole('business')"
+        >
+          <span class="role-icon">🏪</span>
+          <span class="role-text">我是商家</span>
+        </button>
+      </div>
+
       <!-- ===== 品牌区 ===== -->
       <div class="brand-section">
         <div class="brand-ip">
           <!-- 北极狐用 emoji + 暖色背景，与背景小狗画风统一 -->
           <div class="ip-avatar">
-            <span class="ip-emoji">🦊</span>
+            <span class="ip-emoji">{{ currentRole === 'user' ? '🦊' : '💼' }}</span>
           </div>
           <div>
             <h1 class="brand-title">宠迹</h1>
-            <p class="brand-sub">让每一份爱都有迹可循</p>
+            <p class="brand-sub">{{ currentRole === 'user' ? '让每一份爱都有迹可循' : '专业服务，用心经营' }}</p>
           </div>
         </div>
       </div>
@@ -108,10 +130,37 @@
           {{ loading ? '...' : '🐾 登 录' }}
         </button>
 
+        <!-- 第三方登录 -->
+        <div class="third-party-login">
+          <div class="divider">
+            <span class="divider-line"></span>
+            <span class="divider-text">其他登录方式</span>
+            <span class="divider-line"></span>
+          </div>
+          <div class="social-btns">
+            <button class="social-btn wechat" @click="handleSocialLogin('wechat')">
+              <span class="social-icon">💬</span>
+              <span class="social-text">微信</span>
+            </button>
+            <button class="social-btn qq" @click="handleSocialLogin('qq')">
+              <span class="social-icon">🐧</span>
+              <span class="social-text">QQ</span>
+            </button>
+            <button class="social-btn alipay" @click="handleSocialLogin('alipay')">
+              <span class="social-icon">💳</span>
+              <span class="social-text">支付宝</span>
+            </button>
+            <button class="social-btn apple" @click="handleSocialLogin('apple')">
+              <span class="social-icon">🍎</span>
+              <span class="social-text">Apple</span>
+            </button>
+          </div>
+        </div>
+
         <!-- 底部链接 -->
         <div class="login-footer">
           <span>还没有账号？</span>
-          <a href="/register" class="footer-link">立即注册</a>
+          <a :href="currentRole === 'user' ? '/register' : '/business/register'" class="footer-link">立即注册</a>
         </div>
       </form>
     </div>
@@ -124,9 +173,12 @@
 import { reactive, ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { Message } from '@arco-design/web-vue';
 import axios from '@/utils/request';
+import LoginLoader from '@/components/LoginLoader.vue';
 
 // ============ 状态 ============
 const loginType = ref<'password' | 'code'>('password');
+const currentRole = ref<'user' | 'business'>('user');
+const showLoader = ref(false);
 const form = reactive({
   phone: '',
   password: '',
@@ -166,6 +218,11 @@ function refreshCaptcha() {
   form.captchaCode = '';
 }
 
+// ============ 角色切换 ============
+function switchRole(role: 'user' | 'business') {
+  currentRole.value = role;
+}
+
 // ============ 登录方式切换 ============
 function switchLoginType(type: 'password' | 'code') {
   loginType.value = type;
@@ -175,6 +232,16 @@ function switchLoginType(type: 'password' | 'code') {
   if (type === 'code') {
     nextTick(() => refreshCaptcha());
   }
+}
+
+function handleSocialLogin(platform: string) {
+  const platformNames: Record<string, string> = {
+    wechat: '微信',
+    qq: 'QQ',
+    alipay: '支付宝',
+    apple: 'Apple',
+  };
+  Message.info(`${platformNames[platform]}登录功能开发中 🚀`);
 }
 
 // ============ 发送短信验证码 ============
@@ -242,24 +309,27 @@ async function handleLogin() {
   loading.value = true;
   try {
     const payload: any = {
-      phone: form.phone,
-      loginType: loginType.value,
-    };
-    if (loginType.value === 'password') {
-      payload.password = form.password;
-    } else {
-      payload.smsCode = form.smsCode;
-    }
+    phone: form.phone,
+    loginType: loginType.value,
+    role: currentRole.value,
+  };
+  if (loginType.value === 'password') {
+    payload.password = form.password;
+  } else {
+    payload.smsCode = form.smsCode;
+  }
 
     const res = await axios.post('/api/auth/login', payload);
     if (res.data.code === 200) {
-      Message.success('🎉 欢迎回来 🐾');
       localStorage.setItem('token', res.data.data.token);
+      localStorage.setItem('role', currentRole.value);
       const expireTime = Date.now() + 2 * 60 * 60 * 1000;
       localStorage.setItem('tokenExpire', expireTime.toString());
+      showLoader.value = true;
       setTimeout(() => {
-        window.location.href = '/';
-      }, 400);
+        const redirectUrl = currentRole.value === 'user' ? '/' : '/business';
+        window.location.href = redirectUrl;
+      }, 2500);
     } else {
       Message.error(res.data.message || '登录失败');
     }
@@ -272,6 +342,9 @@ async function handleLogin() {
 
 // ============ 生命周期 ============
 onMounted(() => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('tokenExpire');
+  localStorage.removeItem('role');
   if (loginType.value === 'code') {
     refreshCaptcha();
   }
@@ -345,15 +418,54 @@ defineExpose({ refreshCaptcha, switchLoginType });
   100% { transform: translate(20px, -10px); }
 }
 
+/* ===== 角色切换 ===== */
+.role-switch {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  background: rgba(245, 200, 148, 0.08);
+  border-radius: 16px;
+  padding: 4px;
+}
+
+.role-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 0;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 400;
+  color: #a89c92;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: inherit;
+}
+.role-btn.active {
+  background: #ffffff;
+  color: #3d2a1a;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+.role-btn:hover:not(.active) {
+  color: #3d2a1a;
+}
+.role-icon {
+  font-size: 16px;
+}
+
 /* ===== 登录卡片 ===== */
 .login-card {
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
   background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-radius: 40px;
-  padding: 40px 32px 28px;
+  padding: 36px 32px 28px;
   box-shadow: 0 20px 60px rgba(150, 100, 200, 0.15),
               inset 0 1px 0 rgba(255, 255, 255, 0.6);
   border: 1.5px solid rgba(255, 255, 255, 0.3);
@@ -577,6 +689,79 @@ defineExpose({ refreshCaptcha, switchLoginType });
 }
 .footer-link:hover {
   color: #3d2a1a;
+}
+
+/* ===== 第三方登录 ===== */
+.third-party-login {
+  margin-top: 16px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.divider-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #e8dcd0, transparent);
+}
+
+.divider-text {
+  font-size: 12px;
+  color: #c5bbb2;
+  font-weight: 300;
+}
+
+.social-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.social-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.social-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.social-btn.wechat:hover {
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.social-btn.qq:hover {
+  background: rgba(100, 149, 237, 0.1);
+}
+
+.social-btn.alipay:hover {
+  background: rgba(0, 150, 255, 0.1);
+}
+
+.social-btn.apple:hover {
+  background: rgba(50, 50, 50, 0.1);
+}
+
+.social-icon {
+  font-size: 24px;
+}
+
+.social-text {
+  font-size: 11px;
+  color: #a89c92;
 }
 
 .copyright {

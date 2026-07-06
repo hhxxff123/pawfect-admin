@@ -1,9 +1,10 @@
 <template>
   <div
+    ref="wrapperRef"
     class="splash-wrapper"
     :class="{ hidden: isHidden }"
-    ref="wrapperRef"
     :style="{ minHeight: windowHeight + 'px' }"
+    @click="handleSkip"
   >
     <!-- 视频元素 -->
     <video
@@ -11,7 +12,7 @@
       class="splash-video"
       :src="videoSrc"
       autoplay
-      muted
+      :muted="isMuted"
       playsinline
       @ended="onVideoEnded"
       @loadeddata="onVideoLoaded"
@@ -33,6 +34,45 @@
 
     <!-- 进度条（可选，但视频自带时长，可以保留，也可以去掉） -->
     <div class="splash-progress" :style="{ width: progress + '%' }"></div>
+
+    <!-- 声音控制按钮 -->
+    <button
+      class="audio-btn"
+      :title="isMuted ? '打开声音' : '关闭声音'"
+      @click.stop="toggleMute"
+    >
+      <svg
+        v-if="isMuted"
+        class="audio-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+      >
+        <line x1="1" y1="1" x2="23" y2="23"></line>
+        <path d="M9 9v6a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path>
+        <line x1="13" y1="19" x2="9" y2="13"></line>
+        <line x1="17" y1="19" x2="13" y2="13"></line>
+      </svg>
+      <svg
+        v-else
+        class="audio-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+      >
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+      </svg>
+    </button>
+
+    <!-- 跳过提示 -->
+    <div class="skip-tip">
+      <span class="skip-text">点击跳过</span>
+      <span class="skip-arrow">→</span>
+    </div>
   </div>
 </template>
 
@@ -58,8 +98,8 @@
   const windowHeight = ref(window.innerHeight);
   const progress = ref(0);
   const showFallback = ref(false);
+  const isMuted = ref(true);
   let progressTimer: ReturnType<typeof setInterval> | null = null;
-  const fallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
   // 视频路径（默认）
   const videoSrc = props.videoSrc || '/videos/seedance-mini-开场动画.mp4';
@@ -76,6 +116,14 @@
     }
   }
 
+  function handleSkip() {
+    isHidden.value = true;
+    emit('finish');
+    if (videoRef.value) {
+      videoRef.value.pause();
+    }
+  }
+
   function startProgress() {
     const video = videoRef.value;
     if (!video) return;
@@ -83,11 +131,11 @@
       if (video.duration) {
         const pct = (video.currentTime / video.duration) * 100;
         progress.value = Math.min(pct, 100);
-        
+
         // 在视频结束前2秒自动触发结束事件
         const endOffset = 2.5;
         if (video.currentTime >= video.duration - endOffset) {
-          clearInterval(progressTimer!);
+          if (progressTimer) clearInterval(progressTimer);
           progress.value = 100;
           onVideoEnded();
         }
@@ -105,6 +153,12 @@
     showFallback.value = false;
   }
 
+  function toggleMute() {
+    isMuted.value = !isMuted.value;
+    if (videoRef.value) {
+      videoRef.value.muted = isMuted.value;
+    }
+  }
 
   function startFallbackAnimation() {
     if (progressTimer) clearInterval(progressTimer);
@@ -112,14 +166,13 @@
     progressTimer = setInterval(() => {
       progress.value += 1;
       if (progress.value >= 100) {
-        clearInterval(progressTimer!);
+        if (progressTimer) clearInterval(progressTimer);
         onVideoEnded();
       }
     }, 80);
   }
 
   function onVideoError() {
-    console.warn('视频加载失败，启用 fallback 动画');
     showFallback.value = true;
     startFallbackAnimation();
   }
@@ -132,23 +185,21 @@
   // ============ 生命周期 ============
   onMounted(() => {
     window.addEventListener('resize', handleResize);
-    
+
     // 主动触发视频播放，处理浏览器自动播放策略限制
     const video = videoRef.value;
     if (video) {
       video.load();
-      video.play().catch((error) => {
-        console.warn('自动播放失败，尝试交互后播放:', error);
+      video.play().catch(() => {
         // 如果自动播放失败，启用 fallback 动画
         showFallback.value = true;
         startFallbackAnimation();
       });
     }
-    
+
     // 设置超时，如果视频在3秒内没有开始播放，则启用 fallback
     setTimeout(() => {
       if (video && video.paused && !showFallback.value) {
-        console.warn('视频3秒内未播放，启用 fallback');
         showFallback.value = true;
         startFallbackAnimation();
       }
@@ -276,6 +327,85 @@
     background: linear-gradient(90deg, #7c5cbf, #a78cfa);
     z-index: 10001;
     transition: width 0.3s ease;
+  }
+
+  /* 声音控制按钮 */
+  .audio-btn {
+    position: absolute;
+    top: 8%;
+    right: 8%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: none;
+    border-radius: 50%;
+    color: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    z-index: 3;
+    transition: all 0.3s ease;
+  }
+  .audio-btn:hover {
+    background: rgba(0, 0, 0, 0.5);
+    transform: scale(1.1);
+  }
+  .audio-icon {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+  }
+
+  /* 跳过提示 */
+  .skip-tip {
+    position: absolute;
+    bottom: 15%;
+    right: 8%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 20px;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 13px;
+    cursor: pointer;
+    z-index: 3;
+    transition: all 0.3s ease;
+    animation: pulse 2s infinite;
+  }
+  .skip-tip:hover {
+    background: rgba(0, 0, 0, 0.5);
+    transform: scale(1.05);
+  }
+  .skip-arrow {
+    font-size: 14px;
+    animation: arrowMove 1s infinite;
+  }
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 0.7;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+  @keyframes arrowMove {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    50% {
+      transform: translateX(4px);
+    }
   }
 
   /* 移动端适配 */

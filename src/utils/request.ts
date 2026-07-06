@@ -7,11 +7,17 @@ const service: AxiosInstance = axios.create({
   headers: { 'Content-Type': 'application/json;charset=utf-8' },
 });
 
+const WHITE_LIST = ['/api/auth/login', '/api/auth/register', '/api/captcha/', '/api/sms/send'];
+
+function isWhitelist(url: string): boolean {
+  return WHITE_LIST.some(pattern => url.includes(pattern));
+}
+
 // ===== 请求拦截器 =====
 service.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    if (token) {
+    if (token && !isWhitelist(config.url || '')) {
       (config.headers as any).Authorization = `Bearer ${token}`;
     }
     return config;
